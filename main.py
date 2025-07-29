@@ -12,10 +12,6 @@
 
 import sys
 import os
-
-# 현재 디렉토리를 Python path에 추가
-sys.path.insert(0, os.path.dirname(__file__))
-
 from pipeline.quality_pipeline import MusicQualityPipeline
 from utils.audio_utils import print_separator, ensure_output_directory
 
@@ -31,7 +27,7 @@ def print_welcome():
     print("💡 품질 검사 항목:")
     print("  - 길이 검사: 예상보다 너무 짧은 음악인지 확인")
     print("  - 고주파 노이즈: 8kHz 이상 고주파가 3초 이상 지속되는지 확인")
-    print("  - 극단 주파수: 너무 높거나 낮은 주파수가 오래 지속되는지 확인")
+    print("  - 드론/럼블 검사: 40Hz 이하 단조로운 소리가 5초 이상 지속되는지 확인")
     print()
     print("종료하려면 'quit' 또는 'exit'를 입력하세요.")
     print_separator(width=70, char="🎵")

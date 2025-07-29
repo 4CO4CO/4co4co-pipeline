@@ -162,25 +162,25 @@ class AudioQualityFilters:
     
     @staticmethod
     def check_extreme_frequencies(audio_data, sample_rate, 
-                                low_freq_threshold=80, high_freq_threshold=15000, 
-                                duration_threshold=3.0):
-        """너무 높은 혹은 너무 낮은 주파수가 오래 지속되는지 검사"""
+                                low_freq_threshold=40, high_freq_threshold=15000, 
+                                duration_threshold=5.0, dominance_threshold=0.7):
+        """너무 높은 혹은 너무 낮은 주파수가 오래 지속되는지 검사 (더 관대하게)"""
         try:
             # STFT 계산
             f, t, Zxx = signal.stft(audio_data, sample_rate, nperseg=1024)
             
-            # 극단적 주파수 영역 마스크
-            too_low_mask = f <= low_freq_threshold
+            # 극단적 주파수 영역 마스크 (더 관대한 범위)
+            too_low_mask = f <= low_freq_threshold  # 80Hz → 40Hz로 완화
             too_high_mask = f >= high_freq_threshold
             
             # 각 시간 프레임별 극단 주파수 에너지 비율
             total_energy = np.mean(np.abs(Zxx), axis=0)
             
-            # 너무 낮은 주파수 체크
+            # 너무 낮은 주파수 체크 (더 엄격한 임계값)
             if np.any(too_low_mask):
                 low_freq_energy = np.mean(np.abs(Zxx[too_low_mask, :]), axis=0)
                 low_freq_ratio = low_freq_energy / (total_energy + 1e-8)
-                low_dominant_frames = low_freq_ratio > 0.6  # 60% 이상
+                low_dominant_frames = low_freq_ratio > dominance_threshold  # 60% → 70%로 강화
             else:
                 low_dominant_frames = np.zeros(len(t), dtype=bool)
             
@@ -215,12 +215,12 @@ class AudioQualityFilters:
                 else:
                     current_high_duration = 0
             
-            # 실패 조건 체크
-            if max_low_duration > duration_threshold:
+            # 실패 조건 체크 (더 관대한 기준)
+            if max_low_duration > duration_threshold:  # 3초 → 5초로 완화
                 return {
                     'passed': False,
                     'score': 1 - (max_low_duration / duration_threshold),
-                    'reason': f'Too much low frequency (<{low_freq_threshold}Hz) for {max_low_duration:.1f}s'
+                    'reason': f'Too much drone/rumble (<{low_freq_threshold}Hz) for {max_low_duration:.1f}s'
                 }
             
             if max_high_duration > duration_threshold:
@@ -267,9 +267,17 @@ class AudioQualityFilters:
     @classmethod
     def run_all_checks(cls, audio_data, sample_rate, expected_duration=12.0):
         """3가지 핵심 검사만 실행"""
+        print(f"      길이 검사 중...")
         duration_result = cls.check_duration(audio_data, sample_rate, expected_duration)
+        print(f"      길이 검사 완료: {duration_result['reason']}")
+        
+        print(f"      고주파 노이즈 검사 중...")
         high_freq_result = cls.check_high_frequency_noise(audio_data, sample_rate)
+        print(f"      고주파 검사 완료: {high_freq_result['reason']}")
+        
+        print(f"      극단 주파수 검사 중...")
         extreme_freq_result = cls.check_extreme_frequencies(audio_data, sample_rate)
+        print(f"      극단 주파수 검사 완료: {extreme_freq_result['reason']}")
         
         # 전체 통과 여부
         overall_passed = all([
