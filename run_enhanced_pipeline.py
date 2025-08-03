@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-MusicGen 강화된 적응형 품질 필터링 파이프라인
+MusicGen 음악 중심 적응형 품질 필터링 파이프라인
 
 사용법: 
     python run_enhanced_pipeline.py
 
-하나의 프롬프트 → 1개의 곡 생성 & 3단계 종합 평가
+하나의 프롬프트 → 1개의 곡 생성 & 2단계 음악 평가
 EXCELLENT/GOOD 통과할 때까지 계속 재생성합니다.
 """
 
@@ -19,7 +19,7 @@ from utils.audio_utils import print_separator, ensure_output_directory
 
 
 class EnhancedAdaptiveMusicPipeline:
-    """강화된 적응형 음악 파이프라인"""
+    """음악 중심 적응형 파이프라인"""
     
     def __init__(self, output_dir="output"):
         self.output_dir = output_dir
@@ -34,7 +34,7 @@ class EnhancedAdaptiveMusicPipeline:
         start_time = time.time()
         
         print(f"프롬프트: '{prompt}'")
-        print(f"목표: 3단계 종합 평가 통과한 음악 1개 생성")
+        print(f"목표: 2단계 음악 평가 통과한 음악 1개 생성")
         print("=" * 60)
         
         attempts = []
@@ -61,8 +61,8 @@ class EnhancedAdaptiveMusicPipeline:
             
             print(f"완료 ({gen_result['generation_time']:.1f}초)")
             
-            # 2. 3단계 종합 평가
-            print(f"  3단계 종합 평가 시작...")
+            # 2. 2단계 음악 평가
+            print(f"  2단계 음악 평가 시작...")
             enhanced_result = self.enhanced_pipeline.evaluate_single_music(
                 gen_result['audio_data'], 
                 gen_result['sample_rate'],
@@ -99,11 +99,11 @@ class EnhancedAdaptiveMusicPipeline:
             
             # 5. 결과 출력 및 종료 조건 확인
             if enhanced_result['status'] in ['EXCELLENT', 'GOOD']:
-                print(f"  ✅ 품질 검사 통과! (상태: {enhanced_result['status']}, 점수: {enhanced_result['total_score']:.3f})")
+                print(f"  ✅ 음악 평가 통과! (상태: {enhanced_result['status']}, 점수: {enhanced_result['total_score']:.3f})")
                 print(f"  저장됨: {filename}")
                 break
             else:
-                print(f"  ❌ 품질 검사 실패 (상태: {enhanced_result['status']}, 점수: {enhanced_result['total_score']:.3f})")
+                print(f"  ❌ 음악 평가 실패 (상태: {enhanced_result['status']}, 점수: {enhanced_result['total_score']:.3f})")
                 self._print_failure_reasons(enhanced_result)
                 print(f"  저장됨: {filename}")
                 print(f"  다시 시도합니다...")
@@ -122,7 +122,7 @@ class EnhancedAdaptiveMusicPipeline:
         }
     
     def _save_attempt_file(self, audio_result, enhanced_result, attempt_count):
-        """시도별 파일 저장 (강화된 평가 결과 기반)"""
+        """시도별 파일 저장 (음악 평가 결과 기반)"""
         try:
             # 출력 디렉토리 다시 확인
             if not os.path.exists(self.output_dir):
@@ -188,7 +188,7 @@ class EnhancedAdaptiveMusicPipeline:
                 return None
     
     def _print_failure_reasons(self, enhanced_result):
-        """실패 이유 상세 출력"""
+        """실패 이유 상세 출력 (2단계 버전)"""
         print(f"    📊 단계별 실패 분석:")
         
         # 1단계 기본 품질 결과
@@ -215,15 +215,6 @@ class EnhancedAdaptiveMusicPipeline:
             if not musical['flow']['passed']:
                 print(f"        - 흐름: {musical['flow']['reason']}")
         
-        # 3단계 프롬프트 일치도 결과
-        if enhanced_result['semantic_result'] and not enhanced_result['semantic_result']['passed']:
-            print(f"      [3단계] 프롬프트 일치도 부족:")
-            semantic = enhanced_result['semantic_result']
-            print(f"        - {semantic['reason']}")
-            if 'scores' in semantic:
-                scores = semantic['scores']
-                print(f"        - 세부 점수: 전체={scores['full_prompt']:.3f}, 감정={scores['emotion']:.3f}, 장르={scores['genre']:.3f}, 악기={scores['instrument']:.3f}")
-        
         # 개선 제안
         recommendations = self.enhanced_pipeline.get_retry_recommendations(enhanced_result)
         if recommendations:
@@ -232,9 +223,9 @@ class EnhancedAdaptiveMusicPipeline:
                 print(f"        - {rec}")
     
     def _print_enhanced_report(self, attempts, total_time, prompt):
-        """강화된 파이프라인 리포트 출력"""
+        """음악 중심 파이프라인 리포트 출력"""
         print(f"\n{'='*70}")
-        print(f"3단계 종합 평가 최종 결과 리포트")
+        print(f"2단계 음악 중심 평가 최종 결과 리포트")
         print(f"{'='*70}")
         print(f"성공: {len(attempts)}번째 시도에서 품질 기준 통과")
         print(f"총 소요 시간: {total_time:.1f}초")
@@ -286,19 +277,20 @@ class EnhancedAdaptiveMusicPipeline:
 
 def print_welcome():
     """환영 메시지 출력"""
-    print_separator("MusicGen 강화된 적응형 품질 필터링 파이프라인", width=70, char="=")
+    print_separator("MusicGen 음악 중심 적응형 품질 필터링 파이프라인", width=70, char="=")
     print()
-    print("🎵 3단계 종합 평가 시스템:")
-    print("  1단계: 기본 품질 필터 (길이, 노이즈, 극단주파수)")
-    print("  2단계: 음악적 완성도 (리듬, 멜로디, 하모닉, 흐름)")
-    print("  3단계: 프롬프트 일치도 (CLAP 기반 텍스트-오디오 매칭)")
+    print("🎵 2단계 음악 중심 평가 시스템:")
+    print("  1단계: 기본 품질 필터 (길이, 노이즈, 극단주파수) - 30%")
+    print("  2단계: 음악적 완성도 (리듬, 멜로디, 하모닉, 흐름) - 70%")
     print()
     print("🎯 평가 기준:")
-    print("  - EXCELLENT (0.7+): 재생성 불필요, 우수한 품질")
-    print("  - GOOD (0.5-0.7): 재생성 불필요, 양호한 품질")
-    print("  - RETRY (0.5-): 재생성 권장")
+    print("  - EXCELLENT (0.8+): 재생성 불필요, 우수한 품질")
+    print("  - GOOD (0.65+): 재생성 불필요, 양호한 품질")
+    print("  - RETRY (0.65-): 재생성 권장")
     print()
     print("💾 파일 저장: attempt{번호}_{상태}_score{점수}_FINAL.wav")
+    print()
+    print("🎼 음악적 완성도에 집중한 순수 음악 평가!")
     print()
     print("종료하려면 'quit' 또는 'exit'를 입력하세요.")
     print_separator(width=70, char="=")
@@ -339,13 +331,13 @@ def main():
     
     # 파이프라인 초기화
     try:
-        print("\n🔧 강화된 파이프라인 초기화 중...")
+        print("\n🔧 음악 중심 파이프라인 초기화 중...")
         pipeline = EnhancedAdaptiveMusicPipeline(output_dir=output_dir)
         print("✅ 초기화 완료!")
     except Exception as e:
         print(f"❌ 파이프라인 초기화 실패: {e}")
         print("필요한 라이브러리가 설치되었는지 확인하세요:")
-        print("  - pip install librosa msclap transformers torch")
+        print("  - pip install librosa soundfile")
         return 1
     
     # 메인 루프
@@ -366,7 +358,7 @@ def main():
         if not validate_prompt(prompt):
             continue
         
-        # 강화된 적응형 파이프라인 실행
+        # 음악 중심 적응형 파이프라인 실행
         try:
             session_count += 1
             print(f"\n🚀 세션 {session_count} 시작...")
