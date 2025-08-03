@@ -5,26 +5,42 @@ from scipy import signal
 
 class AudioQualityFilters:
     """음악 품질 검사 필터들 - 세분화된 버전"""
-    
+
     @staticmethod
-    def check_duration(audio_data, sample_rate, expected_duration=12.0, tolerance=1.0):
-        """생성된 음악이 예상 길이보다 너무 짧은지 검사"""
+    def check_duration(audio_data, sample_rate, active_threshold_db=-35, min_active_ratio=0.3):
+        """전체 오디오 중 소리가 실제로 나는 비율 검사"""
         try:
-            actual_duration = len(audio_data) / sample_rate
-            min_duration = expected_duration - tolerance
-            
-            if actual_duration < min_duration:
+            if len(audio_data) == 0:
+                return {'passed': False, 'score': 0.0, 'reason': 'Audio data is empty'}
+
+            # RMS 계산 (프레임 단위, 2048 샘플, hop_length=512)
+            rms = librosa.feature.rms(y=audio_data, frame_length=2048, hop_length=512)[0]
+            rms_db = librosa.amplitude_to_db(rms, ref=np.max)
+
+            # 유효한 소리라고 판단되는 프레임 비율 계산
+            active_frames = rms_db > active_threshold_db
+            active_ratio = np.sum(active_frames) / len(active_frames) if len(active_frames) > 0 else 0.0
+
+            if active_ratio < min_active_ratio:
                 return {
                     'passed': False,
-                    'score': actual_duration / expected_duration,
-                    'reason': f'Too short: {actual_duration:.1f}s (expected: {expected_duration:.1f}s)'
+                    'score': round(active_ratio / min_active_ratio, 3),
+                    'reason': f'Only {active_ratio:.1%} active audio (threshold: {min_active_ratio:.0%})'
                 }
-            
-            return {'passed': True, 'score': 1.0, 'reason': f'Duration OK: {actual_duration:.1f}s'}
-            
+
+            return {
+                'passed': True,
+                'score': 1.0,
+                'reason': f'Active audio ratio OK: {active_ratio:.1%}'
+            }
+
         except Exception as e:
-            return {'passed': False, 'score': 0.0, 'reason': f'Duration check error: {e}'}
-    
+            return {
+                'passed': False,
+                'score': 0.0,
+                'reason': f'Active audio check error: {e}'
+            }
+
     @staticmethod
     def check_volume_cutoff(audio_data, sample_rate, cutoff_threshold=2.0):
         """볼륨이 끝부분에서 급격히 떨어지는지 검사"""
